@@ -1,27 +1,32 @@
-# MNIST-Digit-Classification-with-Neural-Network
-Overview\
-This notebook builds a Convolutional Neural Network (CNN) to classify handwritten digits (0–9) from the MNIST dataset using TensorFlow/Keras. It covers the full ML pipeline: data loading, preprocessing, model building, training, evaluation, and deployment.
+# 🔢 MNIST Digit Classification with Neural Network
 
-Libraries Used
-1. numpy- Array operations and math
-2. matplotlib/seaborn- Visualisation and plotting
-3. tensorflow/keras- Model Buldling and training
-4. sklearn- Evaluation metrics (confusion matrix, classification report)
+A Convolutional Neural Network (CNN) built with **TensorFlow/Keras** that classifies handwritten digits (0–9) from the MNIST dataset — achieving **99.46% test accuracy**. The notebook covers the full deep learning pipeline: data loading, preprocessing, augmentation, model building, training with callbacks, evaluation, and inference on custom uploaded images.
 
-Dataset
-1. MNIST- 70,000 grayscale images of handwritten digits (0–9)
-2. Training set- 60,000 images of shape (28,28)
-3. Test set- 10,000 images of shape (28,28)
-4. Classes- 10(digits 0 through 9)
-5. pixel range (raw): [0,255]
+## 📌 Overview
 
-Preprocessing
-Steps
-1. Normalise pixel values from [0, 255] → [0.0, 1.0] by dividing by 255
-2. Add channel dimension: (28, 28) → (28, 28, 1) — required by Conv2D layers
-3. One-hot encode labels: integer class labels → 10-element binary vectors using to_categorical
+MNIST is the classic "hello world" of computer vision. This project goes beyond a bare-bones classifier by adding batch normalization, dropout regularization, data augmentation, an efficient `tf.data` input pipeline, and training callbacks — resulting in a model that misclassifies only **54 out of 10,000** test images.
 
-Model Architecture — MNIST_CNN
+## 📂 Dataset
+
+**MNIST** — 70,000 grayscale images of handwritten digits, loaded via `keras.datasets.mnist`:
+
+| Split | Images | Shape |
+|---|---|---|
+| Training | 60,000 | (28, 28) |
+| Test | 10,000 | (28, 28) |
+
+- **Classes:** 10 (digits 0–9)
+- **Raw pixel range:** [0, 255]
+
+## ⚙️ Preprocessing
+
+1. **Normalize** pixel values from `[0, 255]` → `[0.0, 1.0]`
+2. **Add channel dimension** — `(28, 28)` → `(28, 28, 1)`, required by `Conv2D` layers
+3. **One-hot encode** integer labels into 10-element binary vectors via `to_categorical`
+
+## 🏗️ Model Architecture — `MNIST_CNN`
+
+```
 Input (28, 28, 1)
     ↓
 Block 1: Conv2D(32) → BN → ReLU → Conv2D(32) → BN → ReLU → MaxPool(2×2) → Dropout(0.25)
@@ -29,22 +34,29 @@ Block 1: Conv2D(32) → BN → ReLU → Conv2D(32) → BN → ReLU → MaxPool(2
 Block 2: Conv2D(64) → BN → ReLU → Conv2D(64) → BN → ReLU → MaxPool(2×2) → Dropout(0.25)
     ↓
 Classifier: Flatten → Dense(256) → BN → ReLU → Dropout(0.5) → Dense(10, softmax)
+```
 
-Compilation
-model.compile(
-    optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-    loss="categorical_crossentropy",
-    metrics=["accuracy"],
-)
+- **Optimizer:** Adam (learning rate `1e-3`)
+- **Loss:** Categorical cross-entropy
+- **Total parameters:** 872,426 (871,530 trainable)
 
-Data Augmentation
+## 🔄 Data Augmentation
+
+Applied on-the-fly during training to improve generalization:
+
+```python
 data_augmentation = keras.Sequential([
     layers.RandomRotation(factor=0.1),      # ±10% rotation
     layers.RandomZoom(height_factor=0.1),   # ±10% zoom
     layers.RandomTranslation(0.1, 0.1),     # ±10% pixel shift
 ])
+```
 
-tf.data Pipeline
+## ⚡ Efficient Input Pipeline
+
+Training data flows through a `tf.data.Dataset` pipeline (shuffle → batch → augment → prefetch) for fast, non-blocking training:
+
+```python
 train_ds = (
     tf.data.Dataset.from_tensor_slices((X_train, y_train_ohe))
     .shuffle(60_000)
@@ -53,15 +65,77 @@ train_ds = (
          num_parallel_calls=tf.data.AUTOTUNE)
     .prefetch(tf.data.AUTOTUNE)
 )
+```
 
-<img width="1590" height="384" alt="1" src="https://github.com/user-attachments/assets/67958908-5ef2-401b-8f51-787f4c2a3353" />
-<img width="1167" height="495" alt="2" src="https://github.com/user-attachments/assets/b85bf722-239a-4e50-b523-6cc80766e1c9" />
-<img width="1388" height="495" alt="3" src="https://github.com/user-attachments/assets/a3317bce-7612-498b-a7ea-6a2afa3dd13c" />
-<img width="931" height="790" alt="4" src="https://github.com/user-attachments/assets/cf227cfa-469c-46ba-a3c5-c20ac7034795" />
-<img width="1389" height="1179" alt="5" src="https://github.com/user-attachments/assets/f5c96c2d-acdd-4abb-beb2-ce126e37bda0" />
-<img width="1590" height="679" alt="6" src="https://github.com/user-attachments/assets/ab404089-cc2e-4ea9-98e8-a6d5a7874c63" />
-<img width="1288" height="396" alt="10" src="https://github.com/user-attachments/assets/febcf2ac-d6f4-4321-8f0f-4e180524415d" />
-<img width="1372" height="592" alt="9" src="https://github.com/user-attachments/assets/522a7d79-9ace-4419-9492-52185c0e775c" />
-<img width="1285" height="396" alt="8" src="https://github.com/user-attachments/assets/aae2cb2a-5d70-4551-9215-f2bb8b47a080" />
-<img width="910" height="390" alt="7" src="https://github.com/user-attachments/assets/3f101399-e6b9-437d-98fb-b799c39e1e4a" />
+## 🎯 Training
 
+Trained for up to 30 epochs with three callbacks to keep training efficient and robust:
+
+- **EarlyStopping** — stops when `val_loss` stalls (patience 8), restores best weights
+- **ReduceLROnPlateau** — halves the learning rate when `val_loss` plateaus (patience 4)
+- **ModelCheckpoint** — saves the best model by `val_accuracy`
+
+## 📊 Results
+
+| Metric | Value |
+|---|---|
+| **Test Accuracy** | **99.46%** |
+| Test Loss | 0.0172 |
+| Misclassified | 54 / 10,000 (0.54% error rate) |
+| Total parameters | 872,426 |
+
+Evaluation includes a full confusion matrix, per-class classification report, and visualizations of both correct and misclassified predictions.
+
+## 🖼️ Inference on Your Own Images
+
+The notebook includes a full pipeline for testing the model on custom, hand-drawn digit images:
+
+1. Upload any image (via Colab's file picker)
+2. Convert to grayscale, resize to 28×28, normalize, and invert if needed (MNIST digits are white-on-black)
+3. Get a prediction with confidence score, shown alongside the processed image
+
+## 🛠️ Tech Stack
+
+- **Python 3**
+- **TensorFlow / Keras** — model building, training, and inference
+- **NumPy** — array operations
+- **Matplotlib** & **Seaborn** — visualization (training curves, confusion matrix, sample predictions)
+- **scikit-learn** — evaluation metrics (`classification_report`, `confusion_matrix`)
+- **Pillow (PIL)** — custom image preprocessing
+- **Google Colab** — development environment (file upload widget)
+
+## 📁 Repository Structure
+
+```
+.
+├── MNIST_Digit_Classification_with_Neural_Network.ipynb   # Full pipeline: data, model, training, evaluation, inference
+└── README.md                                               # Project documentation
+```
+
+## 🚀 Getting Started
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/<your-username>/MNIST-Digit-Classification-with-Neural-Network.git
+   cd MNIST-Digit-Classification-with-Neural-Network
+   ```
+2. Install dependencies
+   ```bash
+   pip install tensorflow numpy matplotlib seaborn scikit-learn pillow
+   ```
+3. Open and run the notebook
+   ```bash
+   jupyter notebook MNIST_Digit_Classification_with_Neural_Network.ipynb
+   ```
+   *(The custom-image upload cells use `google.colab.files` and are best run in Google Colab; the rest of the notebook runs anywhere.)*
+
+## 📈 Key Takeaways
+
+- Batch normalization + dropout gave a strong regularization boost, helping the model generalize well beyond 99% test accuracy.
+- Data augmentation (rotation, zoom, translation) improved robustness to natural handwriting variation.
+- `EarlyStopping` + `ReduceLROnPlateau` avoided overfitting while keeping training efficient.
+- The model performs well even on out-of-distribution, user-drawn digit images once properly preprocessed (grayscale, resized, inverted).
+
+## 📄 License
+
+This project is open source and available for educational and research purposes.
